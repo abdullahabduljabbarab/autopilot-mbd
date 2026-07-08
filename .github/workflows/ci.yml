@@ -1,0 +1,107 @@
+# Simulink autopilot CI. Runs the model's smoke sim, executes any
+# Test Manager cases the model exposes, invokes Embedded Coder to
+# generate C source from the model, and uploads everything under
+# ci_artifacts/ so downstream integrations (see the CLEARANCE
+# repo's ClearanceAutopilotMBD module) can pull the generated code
+# as a build artefact.
+#
+# Requires a MATLAB batch license visible to the runner. On the free
+# GitHub-hosted ubuntu-latest / windows-latest runners this works via
+# matlab-actions/setup-matlab@v2 which brings up a valid session for
+# the duration of the job. See MathWorks docs for pinning a specific
+# release.
+#
+# Trigger on every push + PR + manual dispatch. Same pattern as the
+# CLEARANCE-side pipeline.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ==========================================================================
+  # Model tests + code generation. Windows only for now - Embedded Coder
+  # target selection defaults to the host toolchain, and Windows is what the
+  # downstream CLEARANCE build links against. A Linux mirror would need a
+  # separate target configuration.
+  # ==========================================================================
+  model-tests-and-codegen:
+    name: Model tests + Embedded Coder codegen
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          products: >
+            Simulink
+            Simulink_Test
+            Embedded_Coder
+            MATLAB_Coder
+            Simulink_Coder
+
+      # tools/run_model_tests_and_build.m loads autopilot.slx, runs a
+      # smoke sim, runs any Test Manager tests, and writes results under
+      # ci_artifacts/. Any script failure fails the job.
+      - name: Run model tests + build script
+        uses: matlab-actions/run-command@v2
+        with:
+          command: >
+            addpath(genpath(pwd));
+            cd('tools');
+            run_model_tests_and_build;
+            exit(0);
+
+      # After tests pass, generate C source from the model. The generated
+      # tree ends up under slprj/ - copy it out to a stable location that
+      # downstream builds can pull as an artefact.
+      - name: Generate C code (Embedded Coder)
+        uses: matlab-actions/run-command@v2
+        with:
+          command: >
+            addpath(genpath(pwd));
+            model = 'autopilot';
+            load_system(model);
+            set_param(model, 'SystemTargetFile', 'ert.tlc');
+            set_param(model, 'GenCodeOnly', 'on');
+            rtwbuild(model);
+            outDir = fullfile(pwd, 'codegen_out');
+            if isfolder(outDir); rmdir(outDir, 's'); end
+            mkdir(outDir);
+            copyfile(fullfile('slprj', 'ert', model, '*.c'), outDir);
+            copyfile(fullfile('slprj', 'ert', model, '*.h'), outDir);
+            exit(0);
+
+      # Sim outputs, traceability, and any Test Manager results.
+      - name: Upload sim + verification artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopilot-sim-artefacts
+          path: |
+            ci_artifacts/
+            traceability_report.csv
+            traceability_report.html
+            req_map.csv
+          if-no-files-found: warn
+
+      # The generated C code - this is what CLEARANCE's
+      # ClearanceAutopilotMBD module drops into
+      # Plugins/ClearanceSim/ThirdParty/AutopilotGenerated/ to
+      # activate the real model path. Keeping it as a separate
+      # artefact makes it a one-download step for the integrator.
+      - name: Upload generated C code
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopilot-generated-c
+          path: codegen_out/
+          if-no-files-found: error
