@@ -69,17 +69,20 @@ K_alt_i = 0.0002;
 K_theta = 2.0;
 K_q = 0.4;
 
-% -- Inner-loop PID gains referenced by the Simulink PID blocks. Starter
-% values only; tune against step-response targets before code generation.
+% -- Inner-loop PID gains referenced by the Simulink PID blocks.
+% Retuned for a pure-integrator plant (bank rate = aileron directly,
+% no roll damping) which is how the downstream CLEARANCE aircraft
+% dynamics behave. On a pure integrator, P-only with tiny D is stable;
+% integral action would build up and cause limit-cycling. - TripleA
 % Pitch (theta) PID -> elevator
-Kp_theta = 2.0;
-Ki_theta = 0.5;
-Kd_theta = 0.3;
+Kp_theta = 0.5;
+Ki_theta = 0.0;
+Kd_theta = 0.05;
 % Bank (phi) PID -> aileron
-Kp_phi = 3.0;
-Ki_phi = 0.2;
-Kd_phi = 0.4;
-% Airspeed (V) PID -> throttle
+Kp_phi = 0.5;
+Ki_phi = 0.0;
+Kd_phi = 0.05;
+% Airspeed (V) PID -> throttle (kept - speed plant is well-damped)
 Kp_V = 0.05;
 Ki_V = 0.02;
 Kd_V = 0.0;

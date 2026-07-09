@@ -13,6 +13,12 @@ sccprj/
 # to codegen_out/ by the CI job. We upload it as an artefact instead of
 # committing it - regenerated deterministically from the model.
 codegen_out/
+autopilot_ert_rtw/
+
+# ---- Timestamped autosave backups ----
+autopilot_upgraded_*.slx
+autopilot_upgraded_*.slxc
+apply_upgrades_log.txt
 
 # ---- MATLAB session / editor scratch ----
 *.asv

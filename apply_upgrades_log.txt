@@ -1,2 +1,0 @@
-run('tools/apply_model_upgrades.m')
-diary off

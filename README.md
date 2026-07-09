@@ -1,20 +1,98 @@
 # autopilot-mbd
 
-Model-Based Design of PID controllers for aircraft attitude and
-airspeed in Simulink. Three inner-loop controllers (pitch → elevator,
-bank → aileron, airspeed → throttle) with output saturation and
-probe-based signal verification, auto-code-generated to portable C
-via Embedded Coder. Plant dynamics live in the
-[CLEARANCE](https://github.com/) ATC simulator — this repo owns the
-controllers and their MBD tooling chain (traceability, CI, codegen,
-regression check).
+Model-Based Design of a **cascade autopilot** for aircraft attitude and
+airspeed control in Simulink. Three inner-loop PID controllers (bank →
+aileron, pitch → elevator, airspeed → throttle) with saturation and
+probe-based verification, plus outer loops (heading → target bank,
+altitude → target pitch) that turn ATC-level commands into inner-loop
+setpoints. Auto-code-generated to portable C via Embedded Coder using
+**reusable-function packaging**, so every consumer gets its own
+per-instance state — a fleet of aircraft can run the same generated
+model concurrently without shared globals.
+
+Integrated live into the [CLEARANCE](https://github.com/) ATC simulator:
+every aircraft in the sim flies under the Simulink-generated
+autopilot, each carrying its own PID history, filter states, and
+integrator memory. See [Integration with CLEARANCE](#integration-with-clearance)
+below.
 
 ![Autopilot subsystem — inner-loop PID controllers](docs/img/controller_internals.png)
 
 *Inside `AutopilotSubsystem`: three PID controllers with output
-saturation. Pitch (θ) commands drive the elevator (δₑ), airspeed (V)
-drives the throttle (δₜ), bank (φ) drives the aileron (δₐ). Probe
-outports capture pre- and post-saturation signals for verification.*
+saturation. `phi_cmd`/`theta_cmd`/`V_cmd` inputs drive the bank, pitch,
+and airspeed hold loops; outputs are `delta_a`/`delta_e`/`delta_t`
+(aileron / elevator / throttle) surface commands.*
+
+---
+
+## Controller architecture
+
+**Two-tier cascade.** The Simulink model runs the **inner** loops
+(fast attitude and airspeed hold); the CLEARANCE-side wrapper runs
+the **outer** loops (slow ATC command tracking) that generate the
+`phi_cmd` / `theta_cmd` setpoints:
+
+```
+ATC command (heading / altitude / speed)
+        │
+        ▼
+    ┌───────────────────────────────────────────┐
+    │ OUTER loop  (in CLEARANCE C++ wrapper)    │
+    │   heading err  →  target bank  (phi_cmd)  │
+    │   altitude err →  target pitch (theta_cmd)│
+    └───────────────────────────────────────────┘
+        │  phi_cmd, theta_cmd, V_cmd, phi, theta, V
+        ▼
+    ┌───────────────────────────────────────────┐
+    │ INNER loop  (Simulink → generated C)      │
+    │   PID_phi   :  phi_cmd - phi   → delta_a  │
+    │   PID_theta :  theta_cmd - theta → delta_e│
+    │   PID_V     :  V_cmd - V       → delta_t  │
+    └───────────────────────────────────────────┘
+        │  delta_a, delta_e, delta_t
+        ▼
+    Aircraft dynamics (in CLEARANCE)
+```
+
+Each PID has a saturation block modelling control-surface travel
+limits (±25° aileron, ±25° elevator, 0..1 throttle). Probe outports on
+pre- and post-saturation signals feed the traceability report and the
+regression check.
+
+Inner-loop gains (in `model/plant_params.m`) are tuned for a
+pure-integrator plant — the CLEARANCE aircraft dynamics integrate
+control-surface deflection directly, so P-only with a small D term
+gives clean tracking without limit-cycling. Integral action is
+disabled on `PID_phi` and `PID_theta` (Ki = 0) because the outer loop
+zeroes steady-state error at the commanded heading / altitude.
+
+![Top-level model](docs/img/model_top_level.png)
+
+*Top-level: root inports (`phi_cmd`, `theta_cmd`, `V_cmd`, `phi`,
+`theta`, `V`) feed `AutopilotSubsystem`; root outports (`delta_a_out`,
+`delta_e_out`, `delta_t_out`) surface the control commands. Actuator
+lag models (`1/(0.05s+1)`) live on the top level for verification;
+CLEARANCE substitutes its own aircraft dynamics for integration.*
+
+---
+
+## Reusable-function code generation
+
+The model is configured (`tools/configure_reusable_function.m`) with
+**Code Interface Packaging = Reusable function**. Generated entry
+points take a per-instance model pointer:
+
+```c
+void autopilot_initialize(RT_MODEL_autopilot_T *rtM);
+void autopilot_step      (RT_MODEL_autopilot_T *rtM);
+void autopilot_terminate (RT_MODEL_autopilot_T *rtM);
+```
+
+Every field of the run-time state (`blockIO`, `contStates`, `inputs`,
+`outputs`) lives inside the `RT_MODEL_autopilot_T` struct pointed to
+by `rtM`. Consumers allocate one per aircraft. There are **no
+file-scope globals** and no shared state between instances — a fleet
+of any size runs concurrently on the same generated `.c`.
 
 ---
 
@@ -25,16 +103,14 @@ autopilot_repo/
 ├── autopilot.slx              <-- Simulink model (source of truth)
 ├── autopilot.slxc             <-- Simulink cache
 ├── model/
-│   └── plant_params.m         <-- linearised trim params (reference)
+│   └── plant_params.m         <-- linearised trim params + PID gains
 ├── tools/
-│   ├── run_model_tests_and_build.m   <-- CI entry point
-│   ├── compare_sim.m                 <-- tolerance-based regression check
-│   └── ...
+│   ├── run_model_tests_and_build.m       <-- CI entry point
+│   ├── compare_sim.m                     <-- tolerance-based regression
+│   ├── add_control_outports.m            <-- expose delta_e / delta_a as root outports
+│   ├── expose_command_inports.m          <-- promote step blocks to root inports
+│   └── configure_reusable_function.m     <-- switch code interface to reusable
 ├── ci_artifacts/              <-- smoke sim outputs (uploaded by CI)
-│   ├── simOut_with_pid_defaults.mat
-│   ├── delta_e_logs.mat
-│   ├── delta_e_log2.csv
-│   └── delta_e_plot.png
 ├── req_map.csv                <-- requirement → block mapping
 ├── traceability_report.csv    <-- Simulink Requirements Toolbox export
 ├── traceability_report.html
@@ -48,8 +124,7 @@ autopilot_repo/
 
 ## Getting started
 
-Open `autopilot.slx` in Simulink R2023b or later with the following
-toolboxes installed:
+Open `autopilot.slx` in Simulink R2023b or later with:
 
 - Simulink
 - Simulink Test
@@ -61,90 +136,86 @@ Run smoke sim + regression check locally:
 
 ```matlab
 addpath(genpath(pwd))
+run('model/plant_params.m')
 sim('autopilot')
 tools/compare_sim
 ```
 
-`compare_sim.m` fails on drift outside tolerance against the reference
-`simOut_with_pid_defaults.mat`. Embedded Coder generates C into
-`slprj/ert/autopilot/` on `rtwbuild('autopilot')`; the CI job copies
-the `.c` / `.h` files out to `codegen_out/` and uploads them as a
-workflow artefact.
+Generate C for integration:
 
-## Controller architecture
+```matlab
+run('tools/configure_reusable_function.m')  % once, sets the code interface
+rtwbuild('autopilot')                        % produces autopilot.c + autopilot.h
+```
 
-Three independent PID loops with output saturation:
-
-1. **Pitch hold** — `theta_cmd - theta → PID_theta → Sat_theta → delta_e`
-2. **Bank hold** — `phi_cmd - phi → PID_phi → Sat_delta_a → delta_a`
-3. **Airspeed hold** — `V_cmd - V → PID_V → Sat_V → delta_t`
-
-Saturation limits model control-surface travel constraints. Probe
-outports on the pre- and post-saturation signals feed the traceability
-report and the regression check.
-
-![Top-level test harness](docs/img/model_top_level.png)
-
-*Top-level: step commands drive `AutopilotSubsystem`; its outputs
-pass through first-order actuator lag models (`1/(0.05s+1)`) before
-being logged. `delta_e` is tapped for verification against the
-reference sim in `ci_artifacts/`. Plant dynamics for full closed-loop
-behaviour are supplied by the CLEARANCE ATC simulator when this
-autopilot is integrated as a code-generated C module.*
+Output lands in `autopilot_ert_rtw/`. The CI job also copies `.c` /
+`.h` to `codegen_out/` and uploads as a workflow artefact.
 
 ## Verification
 
-Every requirement in `req_map.csv` traces to a specific block in the
-model. `traceability_report.html` renders the coverage matrix — every
-row shows requirement ID, target block path, block type, existence
-check, and whether a verification probe is attached.
+Every requirement in `req_map.csv` traces to a specific block.
+`traceability_report.html` renders the coverage matrix.
 
 ![Traceability report excerpt](docs/img/traceability.png)
 
-*Traceability report — requirement → block mapping generated by the
-Simulink Requirements Toolbox. `HasProbe = 1` means a verification
-probe is attached to that block for signal capture.*
+*Requirement → block mapping generated by the Simulink Requirements
+Toolbox. `HasProbe = 1` means a verification probe is attached to
+that block for signal capture.*
 
-The regression baseline is captured in
-`ci_artifacts/simOut_with_pid_defaults.mat`. `tools/compare_sim.m`
-loads the reference sim, extracts the final `delta_e` value, and
-fails if it drifts outside tolerance.
+`tools/compare_sim.m` loads `ci_artifacts/simOut_with_pid_defaults.mat`
+and fails CI on any drift outside tolerance.
 
 ![Elevator step response](docs/img/step_response.png)
 
-*Elevator command (top) and aileron command (bottom) over the smoke
-sim. The elevator shows PID_theta's derivative kick at t=1 s
-followed by the integrator ramp toward saturation. The aileron
-saturates immediately on the phi command step at t=0. Both curves
-demonstrate the controllers responding to inputs and hitting their
-saturation blocks correctly.*
+*Reference elevator command (top) and aileron command (bottom) over
+the smoke sim. The elevator shows PID_theta's derivative kick at
+t=1 s followed by the integrator ramp toward saturation. The
+aileron saturates on the phi command step at t=0.*
 
 ## Integration with CLEARANCE
 
 The CLEARANCE ATC simulator carries a `ClearanceAutopilotMBD` UE
-plugin module that consumes the generated C code. On every green build
-of this repo the workflow uploads two artefacts:
+plugin module. Its architecture:
 
-- `autopilot-generated-c` — the `.c` / `.h` output.
-- `autopilot-sim-artefacts` — sim outputs + traceability CSVs.
+- **Per-aircraft `FAutopilotWrapper`** — each aircraft's
+  `UClearanceAircraftBehaviour` owns one. The wrapper allocates its
+  own `RT_MODEL_autopilot_T` on first use.
+- **`AutopilotGeneratedUnit.cpp` shim** — a single translation unit
+  includes `autopilot.c` from `ThirdParty/AutopilotGenerated/src/` so
+  Unreal Build Tool compiles it into the module without needing a
+  per-file compilation rule.
+- **`Build.cs` auto-detection** — presence of the generated `include/`
+  and `src/` directories flips `CLEARANCE_AUTOPILOT_MBD_HAVE_CODEGEN=1`
+  and the wrapper switches from a P-only stub to the real generated
+  model transparently.
+- **Cascade wiring** — the wrapper computes `phi_cmd` (heading → bank)
+  and `theta_cmd` (altitude → pitch) outer loops in C++, pushes them
+  plus the aircraft's live state into the model's `ExtU` struct,
+  steps once, reads back `delta_a` / `delta_e` / `delta_t` from
+  `ExtY`, and translates them into aircraft rate changes.
 
-Integrators download the generated-code artefact, drop it into
-CLEARANCE's `Plugins/ClearanceSim/ThirdParty/AutopilotGenerated/`, and
-the UE side picks it up on next rebuild. Drop-in instructions ship
-inside CLEARANCE's plugin tree.
+Console commands in-sim:
+
+```
+clearance.autopilot.engage <callsign>
+clearance.autopilot.disengage <callsign>
+```
+
+Every aircraft is autopilot-engaged by default. Disengage puts a
+specific aircraft back on CLEARANCE's built-in rate-limited slew for
+A/B comparison.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `main` and every PR:
+`.github/workflows/ci.yml` runs on manual dispatch (MATLAB licensing
+on GitHub-hosted runners is a separate concern — see the CI notes in
+CLEARANCE). Steps:
 
-1. Set up MATLAB (via `matlab-actions/setup-matlab@v2`).
+1. Set up MATLAB (`matlab-actions/setup-matlab@v2`).
 2. Run `tools/run_model_tests_and_build.m` — smoke sim + Test Manager.
 3. `rtwbuild('autopilot')` — Embedded Coder generates C.
 4. Upload `codegen_out/`, `ci_artifacts/`, and traceability reports as
    workflow artefacts.
-
-The pipeline fails on any script error, missing test case, or codegen
-failure. Green = the model is buildable, verifiable, and portable.
 
 ## License
 
