@@ -74,14 +74,19 @@ K_q = 0.4;
 % no roll damping) which is how the downstream CLEARANCE aircraft
 % dynamics behave. On a pure integrator, P-only with tiny D is stable;
 % integral action would build up and cause limit-cycling. - TripleA
-% Pitch (theta) PID -> elevator
+% Pitch (theta) PID -> elevator. D removed - the derivative filter's
+% break frequency of 100 rad/s sat right on the edge of the ODE4
+% solver's stability region at the fixed 0.02 s step, producing a
+% frame-rate-dependent limit cycle that read as wing rock on the
+% game side. P-only is stable on the integrator plant and matches
+% real short-period damping fine at ATC time scales. - TripleA
 Kp_theta = 0.5;
 Ki_theta = 0.0;
-Kd_theta = 0.05;
-% Bank (phi) PID -> aileron
+Kd_theta = 0.0;
+% Bank (phi) PID -> aileron. Same rationale as theta above.
 Kp_phi = 0.5;
 Ki_phi = 0.0;
-Kd_phi = 0.05;
+Kd_phi = 0.0;
 % Airspeed (V) PID -> throttle (kept - speed plant is well-damped)
 Kp_V = 0.05;
 Ki_V = 0.02;
