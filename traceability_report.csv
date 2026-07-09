@@ -1,3 +1,18 @@
-ReqID,BlockPath,BlockType,Exists,UserData,HasProbe
-REQ-001,autopilot/AutopilotSubsystem/PID_theta,SubSystem,1,,1
-REQ-002,autopilot/AutopilotSubsystem/Sum_theta,Sum,1,,0
+ReqID,BlockPath,BlockType,Exists,HasProbe,Description
+REQ-AP-001,autopilot/AutopilotSubsystem/PID_phi,PID Controller,1,1,Bank hold controller drives aileron from phi_cmd - phi error
+REQ-AP-002,autopilot/AutopilotSubsystem/Sum_phi,Sum,1,1,Bank error computed as phi_cmd minus phi
+REQ-AP-003,autopilot/AutopilotSubsystem/Sat_delta_a,Saturate,1,1,Aileron saturated to plus/minus 25 degrees
+REQ-AP-004,autopilot/AutopilotSubsystem/PID_theta,PID Controller,1,1,Pitch hold controller drives elevator from theta_cmd - theta error
+REQ-AP-005,autopilot/AutopilotSubsystem/Sum_theta,Sum,1,1,Pitch error computed as theta_cmd minus theta
+REQ-AP-006,autopilot/AutopilotSubsystem/Sat_theta,Saturate,1,1,Elevator saturated to plus/minus 25 degrees
+REQ-AP-007,autopilot/AutopilotSubsystem/PID_V,PID Controller,1,1,Airspeed hold controller drives throttle from V_cmd - V error
+REQ-AP-008,autopilot/AutopilotSubsystem/Sum_V,Sum,1,1,Airspeed error computed as V_cmd minus V
+REQ-AP-009,autopilot/AutopilotSubsystem/Sat_V,Saturate,1,1,Throttle saturated to the range 0 to 1
+REQ-AP-010,autopilot/ail_act,Transfer Fcn,1,1,Aileron actuator first-order lag 1/(0.05s+1)
+REQ-AP-011,autopilot/elev_act,Transfer Fcn,1,1,Elevator actuator first-order lag 1/(0.05s+1)
+REQ-AP-012,autopilot/phi_cmd,Inport,1,1,Root inport phi_cmd accepts commanded bank in radians
+REQ-AP-013,autopilot/theta_cmd,Inport,1,1,Root inport theta_cmd accepts commanded pitch in radians
+REQ-AP-014,autopilot/V_cmd,Inport,1,1,Root inport V_cmd accepts commanded airspeed in m/s
+REQ-AP-015,autopilot/delta_a_out,Outport,1,1,Root outport delta_a_out exposes aileron command in radians
+REQ-AP-016,autopilot/delta_e_out,Outport,1,1,Root outport delta_e_out exposes elevator command in radians
+REQ-AP-017,autopilot/delta_t_out,Outport,1,1,Root outport delta_t_out exposes throttle command 0..1

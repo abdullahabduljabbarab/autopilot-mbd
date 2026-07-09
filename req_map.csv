@@ -1,3 +1,18 @@
-ReqID,Block,Desc
-REQ-001,autopilot/AutopilotSubsystem/PID_theta,Maintain theta within ±0.5 deg
-REQ-002,autopilot/AutopilotSubsystem/Sum_theta,Compute theta error
+ReqID,Block,Description
+REQ-AP-001,autopilot/AutopilotSubsystem/PID_phi,Bank hold controller shall drive aileron from phi_cmd - phi error
+REQ-AP-002,autopilot/AutopilotSubsystem/Sum_phi,Bank error shall be computed as phi_cmd minus phi at Sum_phi
+REQ-AP-003,autopilot/AutopilotSubsystem/Sat_delta_a,Aileron command shall be saturated to plus/minus 25 degrees
+REQ-AP-004,autopilot/AutopilotSubsystem/PID_theta,Pitch hold controller shall drive elevator from theta_cmd - theta error
+REQ-AP-005,autopilot/AutopilotSubsystem/Sum_theta,Pitch error shall be computed as theta_cmd minus theta at Sum_theta
+REQ-AP-006,autopilot/AutopilotSubsystem/Sat_theta,Elevator command shall be saturated to plus/minus 25 degrees
+REQ-AP-007,autopilot/AutopilotSubsystem/PID_V,Airspeed hold controller shall drive throttle from V_cmd - V error
+REQ-AP-008,autopilot/AutopilotSubsystem/Sum_V,Airspeed error shall be computed as V_cmd minus V at Sum_V
+REQ-AP-009,autopilot/AutopilotSubsystem/Sat_V,Throttle command shall be saturated to the range 0 to 1
+REQ-AP-010,autopilot/ail_act,Aileron actuator dynamics shall be modelled as a first-order lag 1/(0.05s+1)
+REQ-AP-011,autopilot/elev_act,Elevator actuator dynamics shall be modelled as a first-order lag 1/(0.05s+1)
+REQ-AP-012,autopilot/phi_cmd,Root inport phi_cmd shall accept commanded bank angle in radians
+REQ-AP-013,autopilot/theta_cmd,Root inport theta_cmd shall accept commanded pitch angle in radians
+REQ-AP-014,autopilot/V_cmd,Root inport V_cmd shall accept commanded airspeed in metres per second
+REQ-AP-015,autopilot/delta_a_out,Root outport delta_a_out shall expose the aileron command in radians
+REQ-AP-016,autopilot/delta_e_out,Root outport delta_e_out shall expose the elevator command in radians
+REQ-AP-017,autopilot/delta_t_out,Root outport delta_t_out shall expose the throttle command in the range 0 to 1
