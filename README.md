@@ -1,7 +1,5 @@
 # autopilot-mbd
 
-[![CI](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml/badge.svg)](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml)
-
 Model-Based Design of PID controllers for aircraft attitude and
 airspeed in Simulink. Three inner-loop controllers (pitch → elevator,
 bank → aileron, airspeed → throttle) with output saturation and
