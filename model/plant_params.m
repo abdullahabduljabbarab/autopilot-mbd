@@ -46,6 +46,20 @@ THETA_LIMIT_RAD = 10*pi/180;
 DELTA_T_MIN = 0.0;
 DELTA_T_MAX = 1.0;
 
+% Lowercase aliases used by the Simulink saturation blocks.
+% Elevator (delta_e) - deflection in radians, +/- 25 deg travel.
+delta_e_max = 25*pi/180;
+delta_e_min = -25*pi/180;
+% Aileron (delta_a) - deflection in radians, +/- 25 deg travel.
+delta_a_max = 25*pi/180;
+delta_a_min = -25*pi/180;
+% Throttle (delta_t) - normalised 0..1.
+delta_t_min = 0.0;
+delta_t_max = 1.0;
+% Rudder (delta_r) - not currently used but declared for completeness.
+delta_r_max = 25*pi/180;
+delta_r_min = -25*pi/180;
+
 % Controller initial gains (placeholders)
 K_hdg = 1.5;
 K_phi = 3.0;
@@ -54,6 +68,21 @@ K_alt_p = 0.001;
 K_alt_i = 0.0002;
 K_theta = 2.0;
 K_q = 0.4;
+
+% -- Inner-loop PID gains referenced by the Simulink PID blocks. Starter
+% values only; tune against step-response targets before code generation.
+% Pitch (theta) PID -> elevator
+Kp_theta = 2.0;
+Ki_theta = 0.5;
+Kd_theta = 0.3;
+% Bank (phi) PID -> aileron
+Kp_phi = 3.0;
+Ki_phi = 0.2;
+Kd_phi = 0.4;
+% Airspeed (V) PID -> throttle
+Kp_V = 0.05;
+Ki_V = 0.02;
+Kd_V = 0.0;
 
 % Anti-windup/backcalc parameters
 ALT_INT_BACKCALC = 0.2;
