@@ -1,15 +1,22 @@
 # autopilot-mbd
 
-Model-Based Design of an aircraft autopilot in Simulink. Cascaded PID
-controllers (heading → bank → aileron, altitude → pitch → elevator,
-airspeed → throttle) auto-code-generated to portable C via Embedded
-Coder, verified against reference sim outputs, and integrated into the
-[CLEARANCE](https://github.com/) air traffic control simulator through a
-UE C++ bridge module.
+[![CI](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml/badge.svg)](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml)
 
-The MATLAB / Simulink model is the source of truth. Everything under
-`codegen_out/` is generated. Verification traces every requirement to
-a test — no untraced controller.
+Model-Based Design of PID controllers for aircraft attitude and
+airspeed in Simulink. Three inner-loop controllers (pitch → elevator,
+bank → aileron, airspeed → throttle) with output saturation and
+probe-based signal verification, auto-code-generated to portable C
+via Embedded Coder. Plant dynamics live in the
+[CLEARANCE](https://github.com/) ATC simulator — this repo owns the
+controllers and their MBD tooling chain (traceability, CI, codegen,
+regression check).
+
+![Autopilot subsystem — inner-loop PID controllers](docs/img/controller_internals.png)
+
+*Inside `AutopilotSubsystem`: three PID controllers with output
+saturation. Pitch (θ) commands drive the elevator (δₑ), airspeed (V)
+drives the throttle (δₜ), bank (φ) drives the aileron (δₐ). Probe
+outports capture pre- and post-saturation signals for verification.*
 
 ---
 
@@ -20,27 +27,24 @@ autopilot_repo/
 ├── autopilot.slx              <-- Simulink model (source of truth)
 ├── autopilot.slxc             <-- Simulink cache
 ├── model/
-│   └── plant_params.m         <-- aircraft state-space + trim params
+│   └── plant_params.m         <-- linearised trim params (reference)
 ├── tools/
 │   ├── run_model_tests_and_build.m   <-- CI entry point
-│   ├── create_autopilot_model.m
-│   ├── populate_autopilot_subsystem.m
-│   ├── fix_autopilot_wiring.m
-│   └── add_alias_inports.m
+│   ├── compare_sim.m                 <-- tolerance-based regression check
+│   └── ...
 ├── ci_artifacts/              <-- smoke sim outputs (uploaded by CI)
 │   ├── simOut_with_pid_defaults.mat
 │   ├── delta_e_logs.mat
 │   ├── delta_e_log2.csv
 │   └── delta_e_plot.png
-├── req_map.csv                <-- requirement → test mapping
+├── req_map.csv                <-- requirement → block mapping
 ├── traceability_report.csv    <-- Simulink Requirements Toolbox export
 ├── traceability_report.html
-├── docs/                      <-- design + verification specifications
+├── docs/
 │   ├── AUTOPILOT_MBD_DESIGN.md
 │   ├── VERIFICATION_REPORT.md
 │   ├── VerificationTest_HDG.md
-│   ├── Reproducible Codegen (CI).md
-│   └── ...
+│   └── img/                   <-- README figures
 └── .github/workflows/ci.yml   <-- MATLAB CI pipeline
 ```
 
@@ -55,42 +59,73 @@ toolboxes installed:
 - MATLAB Coder
 - Simulink Coder
 
-Run tests + generate code locally:
+Run smoke sim + regression check locally:
 
 ```matlab
 addpath(genpath(pwd))
-cd tools
-run_model_tests_and_build
+sim('autopilot')
+tools/compare_sim
 ```
 
-Outputs land under `ci_artifacts/`. Generated C source is written to
-`slprj/ert/autopilot/` — the CI job copies the `.c` / `.h` files out to
-`codegen_out/` and uploads them as a workflow artefact.
+`compare_sim.m` fails on drift outside tolerance against the reference
+`simOut_with_pid_defaults.mat`. Embedded Coder generates C into
+`slprj/ert/autopilot/` on `rtwbuild('autopilot')`; the CI job copies
+the `.c` / `.h` files out to `codegen_out/` and uploads them as a
+workflow artefact.
 
 ## Controller architecture
 
-Three cascaded loops running at 50 Hz:
+Three independent PID loops with output saturation:
 
-1. **Heading hold** — heading error → bank command → aileron.
-2. **Altitude hold** — altitude error → pitch command → elevator.
-3. **Airspeed hold** — airspeed error → throttle command.
+1. **Pitch hold** — `theta_cmd - theta → PID_theta → Sat_theta → delta_e`
+2. **Bank hold** — `phi_cmd - phi → PID_phi → Sat_delta_a → delta_a`
+3. **Airspeed hold** — `V_cmd - V → PID_V → Sat_V → delta_t`
 
-Plant model is a linearised trim about a nominal cruise point (see
-`model/plant_params.m`). Full state-space matrices, gain tables, and
-tuning rationale are in [`docs/AUTOPILOT_MBD_DESIGN.md`](docs/AUTOPILOT_MBD_DESIGN.md).
+Saturation limits model control-surface travel constraints. Probe
+outports on the pre- and post-saturation signals feed the traceability
+report and the regression check.
+
+![Top-level test harness](docs/img/model_top_level.png)
+
+*Top-level: step commands drive `AutopilotSubsystem`; its outputs
+pass through first-order actuator lag models (`1/(0.05s+1)`) before
+being logged. `delta_e` is tapped for verification against the
+reference sim in `ci_artifacts/`. Plant dynamics for full closed-loop
+behaviour are supplied by the CLEARANCE ATC simulator when this
+autopilot is integrated as a code-generated C module.*
 
 ## Verification
 
-Every requirement in `req_map.csv` is tagged in the corresponding
-Simulink Test case. `traceability_report.html` renders the coverage
-matrix. Individual verification narratives (e.g. the heading-hold
-step response) live under `docs/`.
+Every requirement in `req_map.csv` traces to a specific block in the
+model. `traceability_report.html` renders the coverage matrix — every
+row shows requirement ID, target block path, block type, existence
+check, and whether a verification probe is attached.
+
+![Traceability report excerpt](docs/img/traceability.png)
+
+*Traceability report — requirement → block mapping generated by the
+Simulink Requirements Toolbox. `HasProbe = 1` means a verification
+probe is attached to that block for signal capture.*
+
+The regression baseline is captured in
+`ci_artifacts/simOut_with_pid_defaults.mat`. `tools/compare_sim.m`
+loads the reference sim, extracts the final `delta_e` value, and
+fails if it drifts outside tolerance.
+
+![Elevator step response](docs/img/step_response.png)
+
+*Elevator command (top) and aileron command (bottom) over the smoke
+sim. The elevator shows PID_theta's derivative kick at t=1 s
+followed by the integrator ramp toward saturation. The aileron
+saturates immediately on the phi command step at t=0. Both curves
+demonstrate the controllers responding to inputs and hitting their
+saturation blocks correctly.*
 
 ## Integration with CLEARANCE
 
-The CLEARANCE ATC simulator carries a `ClearanceAutopilotMBD` UE plugin
-module that consumes the generated C code. On every green build of this
-repo the workflow uploads two artefacts:
+The CLEARANCE ATC simulator carries a `ClearanceAutopilotMBD` UE
+plugin module that consumes the generated C code. On every green build
+of this repo the workflow uploads two artefacts:
 
 - `autopilot-generated-c` — the `.c` / `.h` output.
 - `autopilot-sim-artefacts` — sim outputs + traceability CSVs.
@@ -106,7 +141,7 @@ inside CLEARANCE's plugin tree.
 
 1. Set up MATLAB (via `matlab-actions/setup-matlab@v2`).
 2. Run `tools/run_model_tests_and_build.m` — smoke sim + Test Manager.
-3. `rtwbuild(model)` — Embedded Coder generates C.
+3. `rtwbuild('autopilot')` — Embedded Coder generates C.
 4. Upload `codegen_out/`, `ci_artifacts/`, and traceability reports as
    workflow artefacts.
 
