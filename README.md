@@ -61,10 +61,40 @@ regression check.
 
 Inner-loop gains (in `model/plant_params.m`) are tuned for a
 pure-integrator plant - the CLEARANCE aircraft dynamics integrate
-control-surface deflection directly, so P-only with a small D term
-gives clean tracking without limit-cycling. Integral action is
-disabled on `PID_phi` and `PID_theta` (Ki = 0) because the outer loop
-zeroes steady-state error at the commanded heading / altitude.
+control-surface deflection directly, so P-only tracking is well
+damped by construction. Integral action is disabled on `PID_phi`
+and `PID_theta` (`Ki = 0`) because the outer loop zeroes steady-state
+error at the commanded heading / altitude, and derivative action is
+disabled (`Kd = 0`) after the solver-stability finding documented
+below.
+
+### Solver-stability finding: why `Kd = 0` on the attitude loops
+
+The initial `PID_phi` / `PID_theta` gains carried a small derivative
+term (`Kd = 0.05`) with the default filter coefficient `N = 100
+rad/s`. Integrated into CLEARANCE, aircraft developed a
+frame-rate-dependent wing rock on any vector command - visible at
+60 fps in-editor, gone when the game dropped to ~2 fps.
+
+Root cause traced back through the generated code: the model's
+ODE4 solver runs at a fixed step of `h = 0.02 s`. With the
+derivative filter's eigenvalue at `-N = -100 rad/s`, the product
+`h · N = 2.0` sat right on the boundary of RK4's stability region
+for that real-negative eigenvalue. Every per-frame `phi` micro-jitter
+excited the filter into a limit cycle instead of damping out.
+
+Two fixes were possible: shrink the solver step (heavier compute
+per call), or zero the derivative gain (removes the marginal
+eigenvalue entirely). Since the plant is a pure integrator,
+proportional-only is provably stable and matches short-period
+damping fine at ATC time scales, so `Kd = 0` is the honest choice.
+Airspeed PID (`PID_V`) retains its derivative term - the speed plant
+is well-damped and doesn't sit near the stability boundary.
+
+The lesson generalises: any continuous-time PID with a filtered
+derivative that codegens to a fixed-step solver needs the check
+`h · N < 2.78` (RK4 stability limit for real eigenvalues) before
+shipping.
 
 ![Top-level model](docs/img/model_top_level.png)
 
