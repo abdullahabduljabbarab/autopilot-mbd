@@ -244,6 +244,16 @@ CLEARANCE). Steps:
 4. Upload `codegen_out/`, `ci_artifacts/`, and traceability reports as
   workflow artefacts.
 
+## Video walkthrough
+
+Full technical walkthrough covering this autopilot alongside its
+sister [radar-mbd](https://github.com/abdullahabduljabbarab/radar-mbd)
+Simulink model: model authoring, Embedded Coder code generation,
+reusable-function packaging, and live integration into the CLEARANCE
+UE5 simulator with every aircraft flying under the generated code.
+
+https://youtu.be/nqjFOimsYHw
+
 ## License
 
 MIT - see [`LICENSE`](LICENSE).
