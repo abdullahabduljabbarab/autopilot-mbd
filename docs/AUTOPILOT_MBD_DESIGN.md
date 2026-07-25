@@ -53,12 +53,21 @@ three choices:
  wind up when the aircraft is on target and the outer loop stops
  commanding, because the integrator never sees error but keeps its
  accumulated value. So `Ki = 0` on the bank and pitch loops.
-- **Small D.** A little derivative damps the closed-loop response
- and keeps overshoot low without adding phase lag. `Kd = 0.05` on
- both attitude axes.
-- **Airspeed loop keeps I.** The throttle-to-speed plant *is*
- first-order in reality (drag rise + engine lag), so PI + a
- windup guard is fine. `Kp_V = 0.05, Ki_V = 0.02, Kd_V = 0`.
+- **`Kd = 0` on the attitude loops.** Originally `Kd = 0.05` with a
+ 100 rad/s derivative filter cut-off, which put the filter's
+ eigenvalue on the boundary of RK4 stability at the model's fixed
+ 0.02 s step (`h · N = 2.0`) and produced a frame-rate-dependent
+ wing rock inside CLEARANCE. Since the plant is a pure integrator,
+ proportional-only is provably stable and matches short-period
+ damping fine at ATC time scales, so zeroing the derivative term
+ was cleaner than shrinking the solver step. See the "Solver-
+ stability finding" section in the top-level README for the full
+ write-up.
+- **Airspeed loop keeps I and D.** The throttle-to-speed plant *is*
+ first-order in reality (drag rise + engine lag) and its filter
+ cut-off sits inside the stability region, so PI + small D + a
+ windup guard is fine. `Kp_V = 0.05, Ki_V = 0.02, Kd_V = <see
+ plant_params.m>`.
 
 Gains live in `model/plant_params.m` and load via the model's
 `PreLoadFcn`, so opening `autopilot.slx` from anywhere pulls them
