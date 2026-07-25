@@ -65,12 +65,20 @@ jobs:
           # NOTE: YAML `>` folds newlines to spaces, so every statement here
           # must terminate with `;` for MATLAB to parse it as one line.
           # Missing `;` after `end` was the cause of a past CI failure.
+          #
+          # `GenerateMakefile='off'` skips the makefile phase that would
+          # otherwise resolve a host toolchain. The GitHub Windows runner
+          # ships Visual Studio 2026 which R2023b's toolchain registry
+          # doesn't know about; without this switch, `rtwbuild()` fails
+          # at toolchain validation even though `GenCodeOnly='on'` means
+          # nothing will actually be compiled.
           command: >
             addpath(genpath(pwd));
             model = 'autopilot';
             load_system(model);
             set_param(model, 'SystemTargetFile', 'ert.tlc');
             set_param(model, 'GenCodeOnly', 'on');
+            set_param(model, 'GenerateMakefile', 'off');
             rtwbuild(model);
             outDir = fullfile(pwd, 'codegen_out');
             if isfolder(outDir), rmdir(outDir, 's'); end;
