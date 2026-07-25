@@ -28,11 +28,10 @@ jobs:
   # ==========================================================================
   model-tests-and-codegen:
     name: Model tests + Embedded Coder codegen
-    # Pin to windows-2022 (has Visual Studio 2022 baseline). The `windows-latest`
-    # image was moved to a newer Windows Server SKU shipping Visual Studio 2026,
-    # which MATLAB R2023b's toolchain registry doesn't recognise, causing
-    # `rtwbuild` to fail at `getDefaultToolchain`.
-    runs-on: windows-2022
+    # `windows-latest` is fine now that MATLAB is pinned to R2026a below;
+    # R2026a knows about the Visual Studio 2026 toolchain that ships on the
+    # current windows-latest image.
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -41,9 +40,12 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          # Pin the MATLAB release the model was saved in. Prevents forward-
-          # or backward-incompat surprises when MathWorks bumps `latest`.
-          release: R2023b
+          # Pinned to R2026a because `autopilot.slx` is saved in that release.
+          # Any older MATLAB refuses to load the model with:
+          #   "Model 'autopilot' was created with a newer version (R2026a)"
+          # If you re-save the model in an older release, bump this pin to
+          # match; the release the model was saved in wins.
+          release: R2026a
           products: >
             Simulink
             Simulink_Test
