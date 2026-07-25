@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml/badge.svg)](https://github.com/abdullahabduljabbarab/autopilot-mbd/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![MATLAB R2023b+](https://img.shields.io/badge/MATLAB-R2023b%2B-orange.svg)](https://www.mathworks.com/products/matlab.html)
+[![MATLAB R2026a+](https://img.shields.io/badge/MATLAB-R2026a%2B-orange.svg)](https://www.mathworks.com/products/matlab.html)
 
 Model-Based Design of a **cascade autopilot** for aircraft attitude and
 airspeed control in Simulink. Three inner-loop PID controllers (bank →
@@ -169,7 +169,7 @@ autopilot_repo/
 
 ## Getting started
 
-Open `autopilot.slx` in Simulink R2023b or later with:
+Open `autopilot.slx` in Simulink R2026a or later with:
 
 - Simulink
 - Simulink Test
