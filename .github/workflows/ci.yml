@@ -62,6 +62,9 @@ jobs:
       - name: Generate C code (Embedded Coder)
         uses: matlab-actions/run-command@v2
         with:
+          # NOTE: YAML `>` folds newlines to spaces, so every statement here
+          # must terminate with `;` for MATLAB to parse it as one line.
+          # Missing `;` after `end` was the cause of a past CI failure.
           command: >
             addpath(genpath(pwd));
             model = 'autopilot';
@@ -70,7 +73,7 @@ jobs:
             set_param(model, 'GenCodeOnly', 'on');
             rtwbuild(model);
             outDir = fullfile(pwd, 'codegen_out');
-            if isfolder(outDir); rmdir(outDir, 's'); end
+            if isfolder(outDir), rmdir(outDir, 's'); end;
             mkdir(outDir);
             copyfile(fullfile('slprj', 'ert', model, '*.c'), outDir);
             copyfile(fullfile('slprj', 'ert', model, '*.h'), outDir);
