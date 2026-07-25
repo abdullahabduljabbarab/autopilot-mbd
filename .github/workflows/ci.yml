@@ -28,10 +28,13 @@ jobs:
   # ==========================================================================
   model-tests-and-codegen:
     name: Model tests + Embedded Coder codegen
-    # `windows-latest` is fine now that MATLAB is pinned to R2026a below;
-    # R2026a knows about the Visual Studio 2026 toolchain that ships on the
-    # current windows-latest image.
-    runs-on: windows-latest
+    # Pin BOTH the runner AND the MATLAB release so the toolchain match works:
+    # - windows-2022 ships Visual Studio 2022 as its C++ baseline
+    # - MATLAB R2026a (pinned below) loads the model and knows the VS 2022 toolchain
+    # `windows-latest` moved to a newer image that ships VS 2026, which no MATLAB
+    # release before ~R2026b has in its toolchain registry — causes `rtwbuild`
+    # to fail at `getDefaultToolchain`.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
