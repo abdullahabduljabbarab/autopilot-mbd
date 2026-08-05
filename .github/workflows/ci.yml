@@ -30,7 +30,7 @@ jobs:
     # - windows-2022 ships Visual Studio 2022 as its C++ baseline
     # - MATLAB R2026a (pinned below) loads the model and knows the VS 2022 toolchain
     # `windows-latest` moved to a newer image that ships VS 2026, which no MATLAB
-    # release before ~R2026b has in its toolchain registry — causes `rtwbuild`
+    # release before ~R2026b has in its toolchain registry: causes `rtwbuild`
     # to fail at `getDefaultToolchain`.
     runs-on: windows-2022
 

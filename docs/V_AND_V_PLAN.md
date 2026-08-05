@@ -1,4 +1,4 @@
-# Verification and Validation Plan — autopilot-mbd
+# Verification and Validation Plan: autopilot-mbd
 
 Companion to [`../req_map.csv`](../req_map.csv) (the source-of-truth requirement-to-block mapping) and [`../traceability_report.html`](../traceability_report.html) (the rendered coverage matrix). If `req_map.csv` answers "what is the model supposed to do?", this doc answers "how do we prove it does?".
 
@@ -12,7 +12,7 @@ Verification and validation on a Model-Based Design project is a proportionality
 |---|---|
 | Every requirement in `req_map.csv` | 17 REQ-AP-* entries across bank / pitch / airspeed loops, actuator dynamics, and root port contracts |
 | Every block, subsystem, and root port cited by a requirement | The `Block` column of the CSV is grep-able against the model and against the `verify_*.m` scripts |
-| Fixed-step solver stability against the ODE4 step-size / derivative-filter cut-off product | Called out explicitly because it drove the `Kd = 0` finding on the attitude PIDs — see [`AUTOPILOT_MBD_DESIGN.md`](AUTOPILOT_MBD_DESIGN.md) |
+| Fixed-step solver stability against the ODE4 step-size / derivative-filter cut-off product | Called out explicitly because it drove the `Kd = 0` finding on the attitude PIDs: see [`AUTOPILOT_MBD_DESIGN.md`](AUTOPILOT_MBD_DESIGN.md) |
 | Embedded-Coder-generated C's structural equivalence to the model | Regression check via `tools/compare_sim.m` comparing generated-code sim vs `sim('autopilot')` reference |
 | Reusable-function packaging isolation between instances | Verified informally through CLEARANCE integration (fleet of aircraft, no shared-state bugs); no automated multi-instance test in this repo |
 

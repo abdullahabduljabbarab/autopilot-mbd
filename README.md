@@ -231,7 +231,7 @@ and fails CI on any drift outside tolerance.
 *Figure 4: Smoke-sim response after the `Kd = 0` design change on the
 attitude PIDs. Top: elevator command to a 5° pitch step at t = 1 s.
 Bottom: aileron command to a 5° bank step at t = 0.5 s. Both signals
-show a clean proportional-only response — a fast initial rise to
+show a clean proportional-only response: a fast initial rise to
 ~0.19 rad (~10.9°) followed by an immediate settle to the ~0.043 rad
 (~2.5°) steady-state trim required to hold the commanded attitude,
 with no derivative kick and no integrator wind-up. Both peaks sit
